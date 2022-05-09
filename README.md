@@ -2,7 +2,7 @@
 仅供学习用.
 
 十分感谢港科大各位老师的工作.
-
+//Remote
 目前仅仅注释了前端VIO部分.
 ## 相应博客
 [VINS-FUSION代码超详细注释（VIO部分）/VIO入门(1)](https://blog.csdn.net/weixin_39926594/article/details/103408620)
