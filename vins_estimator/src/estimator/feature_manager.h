@@ -26,7 +26,9 @@ using namespace Eigen;
 #include "../utility/tic_toc.h"
 
 // 特征点在每一帧上的属性
-// 它指的是空间特征点P1映射到frame1或frame2上对应的图像坐标、特征点的跟踪速度、空间坐标等属性都封装到类FeaturePerFrame中
+
+// 它指的是空间特征点P1映射到frame1或frame2上对应的图像坐标、
+// 特征点的跟踪速度、空间坐标等属性都封装到类FeaturePerFrame中
 class FeaturePerFrame
 {
   public:
@@ -72,21 +74,20 @@ class FeaturePerId
     int start_frame;//第一次出现该特征点的帧号
 
     /*class FeaturePerFrame
-    它指的是空间特征点P1映射到frame1或frame2上对应的图像坐标、特征点的跟踪速度、空间坐标等属性都封装到类FeaturePerFrame中*/
+    它指的是空间特征点P1映射到frame1或frame2上对应的图像坐标、
+    特征点的跟踪速度、空间坐标等属性都封装到类FeaturePerFrame中*/
     //这个特征点在所有观测到他的图像上的性质
     vector<FeaturePerFrame> feature_per_frame; 
 
     int used_num;//出现的次数
     double estimated_depth; //逆深度
     int solve_flag; // 该特征点的状态，是否被三角 0 haven't solve yet; 1 solve succ; 2 solve fail;
-
     // 构造函数
     FeaturePerId(int _feature_id, int _start_frame)
         : feature_id(_feature_id), start_frame(_start_frame),
           used_num(0), estimated_depth(-1.0), solve_flag(0)
     {
     }
-
     int endFrame();
 };
 

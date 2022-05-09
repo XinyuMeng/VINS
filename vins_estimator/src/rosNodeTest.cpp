@@ -21,6 +21,13 @@
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
 
+#include <nav_msgs/Path.h>
+#include <std_msgs/String.h>
+#include <nav_msgs/Odometry.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <tf/transform_broadcaster.h>
+#include <tf/tf.h>
+
 Estimator estimator; //申明一个estimator，也就是VIO。自动执行该类的构造函数
 // queue是队列，插入只允许在尾部进行，检索删除等在头部进行
 queue<sensor_msgs::ImuConstPtr> imu_buf;
@@ -28,6 +35,10 @@ queue<sensor_msgs::PointCloudConstPtr> feature_buf;
 queue<sensor_msgs::ImageConstPtr> img0_buf;
 queue<sensor_msgs::ImageConstPtr> img1_buf;
 std::mutex m_buf; //似乎和C++11 的并发和多线程编程有关，留待后续了解
+
+nav_msgs::Path  path;
+ros::Publisher  path_pub;
+
 /*
 基本作用： 互斥占有一个变量，一段时间内仅一个线程可以访问。
 即该类可以限制对某物的访问，只有先获得许可才可访问某物，否则一般可设为阻塞等待。
@@ -76,7 +87,7 @@ cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr &img_msg)
 // 并将图像输入到估计器中
 void sync_process()
 {
-    while(1)
+    while(ros::ok())
     {
         if(STEREO)//如果是双目
         {
@@ -100,7 +111,7 @@ void sync_process()
                     printf("throw img1\n");
                 }
                 else
-                // 这里的话就是时间对其了的话
+                // 这里的话就是时间对齐了的话
                 {
                     time = img0_buf.front()->header.stamp.toSec();
                     header = img0_buf.front()->header;
@@ -137,6 +148,8 @@ void sync_process()
         std::this_thread::sleep_for(dura);
     }
 }
+
+
 
 // 输入imu的msg信息，进行解算并把imu数据输入到estimator
 void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
@@ -237,7 +250,7 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "vins_estimator"); // ros的初始化ros::init(argc,argv,"my_node_name");// node_name，初始化一个节点
     ros::NodeHandle n("~"); // 获取节点的句柄，句柄可以让你通过构造函数指定命名空间，此处似乎有个命名空间的问题。用来对当前节点进行各种操作。
-    ros::console::(set_logger_levelROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info); //设置记录器级别ROS控制台默认名称
+    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info); //设置记录器级别ROS控制台默认名称
 
     if(argc != 2)
     {
@@ -277,6 +290,10 @@ int main(int argc, char **argv)
     ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);
     ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);
     ros::Subscriber sub_cam_switch = n.subscribe("/vins_cam_switch", 100, cam_switch_callback);
+
+
+//    path_pub = n.advertise<nav_msgs::Path>("odom3d_path", 10, true);
+//    ros::Subscriber odomSub = n.subscribe<nav_msgs::Odometry>("/odometry", 100, pathCallback);  //订阅里程计话题信息
 
     std::thread sync_thread{sync_process}; //创建sync_thread线程，指向sync_process，这里边处理了processMeasurements的线程
     ros::spin(); // 用于触发topic, service的响应队列

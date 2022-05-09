@@ -40,12 +40,15 @@ void GlobalOptimization::GPS2XYZ(double latitude, double longitude, double altit
 void GlobalOptimization::inputOdom(double t, Eigen::Vector3d OdomP, Eigen::Quaterniond OdomQ)
 {
 	mPoseMap.lock();
+    // 把vio直接输出的位姿存入 localPoseMap 中
     vector<double> localPose{OdomP.x(), OdomP.y(), OdomP.z(), 
     					     OdomQ.w(), OdomQ.x(), OdomQ.y(), OdomQ.z()};
     localPoseMap[t] = localPose;
 
 
     Eigen::Quaterniond globalQ;
+    /// 把VIO转换到GPS坐标系下，准确的说是转换到以第一帧GPS为原点的坐标系下
+    /// 转换之后的位姿插入到globalPoseMap 中
     globalQ = WGPS_T_WVIO.block<3, 3>(0, 0) * OdomQ;
     Eigen::Vector3d globalP = WGPS_T_WVIO.block<3, 3>(0, 0) * OdomP + WGPS_T_WVIO.block<3, 1>(0, 3);
     vector<double> globalPose{globalP.x(), globalP.y(), globalP.z(),
@@ -53,7 +56,7 @@ void GlobalOptimization::inputOdom(double t, Eigen::Vector3d OdomP, Eigen::Quate
     globalPoseMap[t] = globalPose;
     lastP = globalP;
     lastQ = globalQ;
-
+    // 把最新的全局姿态插入轨迹当中
     geometry_msgs::PoseStamped pose_stamped;
     pose_stamped.header.stamp = ros::Time(t);
     pose_stamped.header.frame_id = "world";
@@ -78,12 +81,18 @@ void GlobalOptimization::getGlobalOdom(Eigen::Vector3d &odomP, Eigen::Quaternion
 
 void GlobalOptimization::inputGPS(double t, double latitude, double longitude, double altitude, double posAccuracy)
 {
-	double xyz[3];
+    printf("Opt.inputGPS:\n");
+    double xyz[3];
+    // 因为经纬度表示的是地球上的坐标，而地球是一个球形，
+    // 需要首先把经纬度转化到平面坐标系上
+    // 值得一提的是，GPS2XYZ()并非把经纬度转化到世界坐标系下(以0经度，0纬度为原点)，
+    // 而是以第一帧GPS数据为坐标原点，这一点需要额外注意
 	GPS2XYZ(latitude, longitude, altitude, xyz);
-	vector<double> tmp{xyz[0], xyz[1], xyz[2], posAccuracy};
+    // 经纬度计算出的平面坐标，存入GPSPositionMap中
+    vector<double> tmp{xyz[0], xyz[1], xyz[2], posAccuracy};
     //printf("new gps: t: %f x: %f y: %f z:%f \n", t, tmp[0], tmp[1], tmp[2]);
 	GPSPositionMap[t] = tmp;
-    newGPS = true;
+    newGPS = true;//有可用的Gps数据，将进行融合optimize
 
 }
 
@@ -142,10 +151,14 @@ void GlobalOptimization::optimize()
                     Eigen::Matrix4d wTj = Eigen::Matrix4d::Identity();
                     wTi.block<3, 3>(0, 0) = Eigen::Quaterniond(iterVIO->second[3], iterVIO->second[4], 
                                                                iterVIO->second[5], iterVIO->second[6]).toRotationMatrix();
+
                     wTi.block<3, 1>(0, 3) = Eigen::Vector3d(iterVIO->second[0], iterVIO->second[1], iterVIO->second[2]);
+
                     wTj.block<3, 3>(0, 0) = Eigen::Quaterniond(iterVIONext->second[3], iterVIONext->second[4], 
                                                                iterVIONext->second[5], iterVIONext->second[6]).toRotationMatrix();
+
                     wTj.block<3, 1>(0, 3) = Eigen::Vector3d(iterVIONext->second[0], iterVIONext->second[1], iterVIONext->second[2]);
+
                     Eigen::Matrix4d iTj = wTi.inverse() * wTj;
                     Eigen::Quaterniond iQj;
                     iQj = iTj.block<3, 3>(0, 0);
@@ -234,7 +247,9 @@ void GlobalOptimization::optimize()
             	    WGPS_T_body.block<3, 3>(0, 0) = Eigen::Quaterniond(globalPose[3], globalPose[4], 
             	                                                        globalPose[5], globalPose[6]).toRotationMatrix();
             	    WGPS_T_body.block<3, 1>(0, 3) = Eigen::Vector3d(globalPose[0], globalPose[1], globalPose[2]);
-            	    WGPS_T_WVIO = WGPS_T_body * WVIO_T_body.inverse();
+
+                    //更新世界坐标系与VIO间的外参，不再是单位矩阵
+                    WGPS_T_WVIO = WGPS_T_body * WVIO_T_body.inverse();
             	}
             }
             updateGlobalPath();

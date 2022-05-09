@@ -13,7 +13,7 @@
 
 // 更新得到新的陀螺仪漂移Bgs
 // 对应视觉IMU对其的第二部分
-// 对应https://mp.weixin.qq.com/s/9twYJMOE8oydAzqND0UmFw中的公式31-34
+// 对应 https://mp.weixin.qq.com/s/9twYJMOE8oydAzqND0UmFw 中的公式31-34
 void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
 {
     Matrix3d A;
@@ -52,13 +52,14 @@ void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
 
 MatrixXd TangentBasis(Vector3d &g0)
 {
+    // TangentBasis()找出重力的的在单位圆的正切空间, 然后认为重力可以在该正切空间中优化
     Vector3d b, c;
     Vector3d a = g0.normalized();
     Vector3d tmp(0, 0, 1);
     if(a == tmp)
         tmp << 1, 0, 0;
-    b = (tmp - a * (a.transpose() * tmp)).normalized();
-    c = a.cross(b);
+    b = (tmp - a * (a.transpose() * tmp)).normalized();// 这里是求与g垂直的向量,即b2
+    c = a.cross(b);// 求b1
     MatrixXd bc(3, 2);
     bc.block<3, 1>(0, 0) = b;
     bc.block<3, 1>(0, 1) = c;

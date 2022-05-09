@@ -68,6 +68,8 @@ public:
 
     CataCamera();
 
+
+
     /**
     * \brief Constructor from the projection model parameters
     */

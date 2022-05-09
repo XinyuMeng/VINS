@@ -83,22 +83,26 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     //printf("vio_callback! \n");
     double t = pose_msg->header.stamp.toSec();
     last_vio_t = t;
+    // 获取VIO输出的位置(三维向量)，姿态(四元数)
     Eigen::Vector3d vio_t(pose_msg->pose.pose.position.x, pose_msg->pose.pose.position.y, pose_msg->pose.pose.position.z);
     Eigen::Quaterniond vio_q;
     vio_q.w() = pose_msg->pose.pose.orientation.w;
     vio_q.x() = pose_msg->pose.pose.orientation.x;
     vio_q.y() = pose_msg->pose.pose.orientation.y;
     vio_q.z() = pose_msg->pose.pose.orientation.z;
-    globalEstimator.inputOdom(t, vio_t, vio_q);
+    globalEstimator.inputOdom(t, vio_t, vio_q);    // 位姿传入global Estimator中
 
 
     m_buf.lock();
+    // 寻找与VIO时间戳相对应的GPS消息
     while(!gpsQueue.empty())
     {
+        // 获取最老的GPS数据和其时间
         sensor_msgs::NavSatFixConstPtr GPS_msg = gpsQueue.front();
         double gps_t = GPS_msg->header.stamp.toSec();
         printf("vio t: %f, gps t: %f \n", t, gps_t);
         // 10ms sync tolerance
+        // +- 10ms的时间偏差
         if(gps_t >= t - 0.01 && gps_t <= t + 0.01)
         {
             //printf("receive GPS with timestamp %f\n", GPS_msg->header.stamp.toSec());
@@ -111,7 +115,8 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
                 pos_accuracy = 1;
             //printf("receive covariance %lf \n", pos_accuracy);
             //if(GPS_msg->status.status > 8)
-                globalEstimator.inputGPS(t, latitude, longitude, altitude, pos_accuracy);
+            // 向globalEstimator中输入GPS数据
+            globalEstimator.inputGPS(t, latitude, longitude, altitude, pos_accuracy);
             gpsQueue.pop();
             break;
         }
@@ -137,24 +142,32 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     odometry.pose.pose.orientation.y = global_q.y();
     odometry.pose.pose.orientation.z = global_q.z();
     odometry.pose.pose.orientation.w = global_q.w();
+    // 广播轨迹
     pub_global_odometry.publish(odometry);
     pub_global_path.publish(*global_path);
     publish_car_model(t, global_t, global_q);
 
 
     // write result to file
-    std::ofstream foutC("/home/tony-ws1/output/vio_global.csv", ios::app);
+    std::ofstream foutC("/home/mxy/CODES/VINS-FUSION_ws/output/vio_global.csv", ios::app);
     foutC.setf(ios::fixed, ios::floatfield);
     foutC.precision(0);
     foutC << pose_msg->header.stamp.toSec() * 1e9 << ",";
     foutC.precision(5);
-    foutC << global_t.x() << ","
-            << global_t.y() << ","
-            << global_t.z() << ","
-            << global_q.w() << ","
-            << global_q.x() << ","
-            << global_q.y() << ","
-            << global_q.z() << endl;
+//    foutC << global_t.x() << ","
+//            << global_t.y() << ","
+//            << global_t.z() << ","
+//            << global_q.w() << ","
+//            << global_q.x() << ","
+//            << global_q.y() << ","
+//            << global_q.z() << endl;
+    foutC << global_t.x() << " "
+          << global_t.y() << " "
+          << global_t.z() << " "
+          << global_q.w() << " "
+          << global_q.x() << " "
+          << global_q.y() << " "
+          << global_q.z() << endl;
     foutC.close();
 }
 

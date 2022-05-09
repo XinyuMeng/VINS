@@ -14,7 +14,7 @@ Eigen::Matrix3d Utility::g2R(const Eigen::Vector3d &g)
 {
     Eigen::Matrix3d R0;
     Eigen::Vector3d ng1 = g.normalized();//对输入的加速度归一化
-    Eigen::Vector3d ng2{0, 0, 1.0};//这个是理想的重力加速度
+    Eigen::Vector3d ng2{0, 0, 1.0};//这个是理想的IMU坐标系重力)
 
     // 返回一个四元数，它表示两个任意向量ng1和ng2之间的旋转
     R0 = Eigen::Quaterniond::FromTwoVectors(ng1, ng2).toRotationMatrix();

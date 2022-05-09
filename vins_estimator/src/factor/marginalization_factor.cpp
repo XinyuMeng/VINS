@@ -124,16 +124,16 @@ void MarginalizationInfo::addResidualBlockInfo(ResidualBlockInfo *residual_block
 // 之前通过调用 addResidualBlockInfo() 已经确定marg变量的数量、存储位置、长度以及待优化变量的数量以及存储位置，下面就需要调用 preMarginalize() 进行预处理
 void MarginalizationInfo::preMarginalize()
 {
-    for (auto it : factors)//在前面的 addResidualBlockInfo 中会将不同的残差块加入到factor中
+    for (auto it : factors)//遍历之前加入的所有的ResidualBlockInfo;  在前面的 addResidualBlockInfo 中会将不同的残差块加入到factor中
     {
-        it->Evaluate();//利用c++的多态性分别计算所有状态变量构成的残差和雅克比矩阵,其实就是调用各个损失函数中的重载函数Evaluate()
+        it->Evaluate();//分别重新计算残差与雅克比矩阵; 利用c++的多态性,其实就是调用各个损失函数中的重载函数Evaluate()
 
         std::vector<int> block_sizes = it->cost_function->parameter_block_sizes();
         for (int i = 0; i < static_cast<int>(block_sizes.size()); i++)
         {
             long addr = reinterpret_cast<long>(it->parameter_blocks[i]);//优化变量的地址
             int size = block_sizes[i];
-            if (parameter_block_data.find(addr) == parameter_block_data.end())//parameter_block_data是整个优化变量的数据
+            if (parameter_block_data.find(addr) == parameter_block_data.end())//占坑，将参数块的地址和内存块插入到表中; parameter_block_data 是整个优化变量的数据
             {
                 double *data = new double[size];
                 memcpy(data, it->parameter_blocks[i], sizeof(double) * size);//重新开辟一块内存

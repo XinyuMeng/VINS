@@ -80,6 +80,7 @@ class Estimator
     bool IMUAvailable(double t);
     void initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector);
 
+
     // VINS系统的两种状态：
     enum SolverFlag
     {

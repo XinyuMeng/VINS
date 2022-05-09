@@ -67,7 +67,7 @@ class IntegrationBase
 
     // 中值积分递推Jacobian和Covariance
     // _acc_0上次测量加速度 _acc_1本次测量加速度 delta_p上一次的位移 result_delta_p位置变化量计算结果 update_jacobian是否更新雅克比
-    void midPointIntegration(double _dt, 
+    void midPointIntegration(double _dt,
                             const Eigen::Vector3d &_acc_0, const Eigen::Vector3d &_gyr_0,
                             const Eigen::Vector3d &_acc_1, const Eigen::Vector3d &_gyr_1,
                             const Eigen::Vector3d &delta_p, const Eigen::Quaterniond &delta_q, const Eigen::Vector3d &delta_v,
@@ -75,7 +75,7 @@ class IntegrationBase
                             Eigen::Vector3d &result_delta_p, Eigen::Quaterniond &result_delta_q, Eigen::Vector3d &result_delta_v,
                             Eigen::Vector3d &result_linearized_ba, Eigen::Vector3d &result_linearized_bg, bool update_jacobian)
     {
-        //ROS_INFO("midpoint integration");
+        ROS_INFO("midpoint integration");
         
         // 更新预积分的值
         Vector3d un_acc_0 = delta_q * (_acc_0 - linearized_ba);
@@ -106,13 +106,14 @@ class IntegrationBase
                 -a_1_x(1), a_1_x(0), 0;
 
             // 对应VIO课程中第三讲的公式44 这个就是雅克比矩阵啊！！
+            // 博客中有参数的含义：https://blog.csdn.net/qq_42800654/article/details/111914464
             MatrixXd F = MatrixXd::Zero(15, 15);
             F.block<3, 3>(0, 0) = Matrix3d::Identity();
             F.block<3, 3>(0, 3) = -0.25 * delta_q.toRotationMatrix() * R_a_0_x * _dt * _dt + 
-                                  -0.25 * result_delta_q.toRotationMatrix() * R_a_1_x * (Matrix3d::Identity() - R_w_x * _dt) * _dt * _dt;
-            F.block<3, 3>(0, 6) = MatrixXd::Identity(3,3) * _dt;
-            F.block<3, 3>(0, 9) = -0.25 * (delta_q.toRotationMatrix() + result_delta_q.toRotationMatrix()) * _dt * _dt;
-            F.block<3, 3>(0, 12) = -0.25 * result_delta_q.toRotationMatrix() * R_a_1_x * _dt * _dt * -_dt;
+                                  -0.25 * result_delta_q.toRotationMatrix() * R_a_1_x * (Matrix3d::Identity() - R_w_x * _dt) * _dt * _dt;//f01
+            F.block<3, 3>(0, 6) = MatrixXd::Identity(3,3) * _dt;//f02
+            F.block<3, 3>(0, 9) = -0.25 * (delta_q.toRotationMatrix() + result_delta_q.toRotationMatrix()) * _dt * _dt;//f03
+            F.block<3, 3>(0, 12) = -0.25 * result_delta_q.toRotationMatrix() * R_a_1_x * _dt * _dt * -_dt;//f04
             F.block<3, 3>(3, 3) = Matrix3d::Identity() - R_w_x * _dt;
             F.block<3, 3>(3, 12) = -1.0 * MatrixXd::Identity(3,3) * _dt;
             F.block<3, 3>(6, 3) = -0.5 * delta_q.toRotationMatrix() * R_a_0_x * _dt + 

@@ -190,11 +190,12 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
         cv::Mat imgTrack = featureTracker.getTrackImage();
         pubTrackImage(imgTrack, t);
     }
-    
-    if(MULTIPLE_THREAD) //FIXME: 多线程的处理还是很迷糊 
+
+    //多线程表示对数据处理函数新开一个线程
+    if(MULTIPLE_THREAD) //FIXME: 多线程的处理还是很迷糊
     {     
-        if(inputImageCnt % 2 == 0)
-        {
+        if(inputImageCnt % 2 == 0)//两帧一次，所以相机30Hz而最终的tf、odom、path都是15Hz
+        {   //将featureFrame放入特征点缓存队列中，processMeasurements函数逐帧从特征点队列中取特征点
             mBuf.lock();
             featureBuf.push(make_pair(t, featureFrame));
             mBuf.unlock();
@@ -202,6 +203,7 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
     }
     else
     {
+        //顺序执行，featureBuf中放一帧，processMeaturements便从中取一帧，此时featureBuf没什么意义
         mBuf.lock();
         featureBuf.push(make_pair(t, featureFrame));
         mBuf.unlock();
@@ -331,7 +333,7 @@ void Estimator::processMeasurements()
             if(USE_IMU)
             {
                 if(!initFirstPoseFlag)
-                    initFirstIMUPose(accVector);
+                    initFirstIMUPose(accVector);//初始化第一帧imu的姿态
                 for(size_t i = 0; i < accVector.size(); i++)
                 {
                     double dt;//计算每次imu量测之间的dt
@@ -343,6 +345,12 @@ void Estimator::processMeasurements()
                         dt = accVector[i].first - accVector[i - 1].first;
 
                     processIMU(accVector[i].first, dt, accVector[i].second, gyrVector[i].second);
+                     /*
+                    processIMU中对数据push_back的同时进行了预积分,
+                    propagate()为预积分的传播方程;
+                    具体的积分使用的是中值积分法midPointIntegration()
+                    同时维护更新的Jacobian和covariance;
+                    */
                 }
             }
             mProcess.lock();
@@ -405,7 +413,7 @@ void Estimator::initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r)
 }
 
 /* 对imu计算预积分
-传进来的是一个imu数据 得到预积分值pre_integrations 还有一个tmp_pre_integration */
+传进来的是一个imu数据 得到预积分值pre_integrations ,还有一个tmp_pre_integration ,也更新了P,V,Q的值*/
 void Estimator::processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
 {
     // 第一个imu处理
@@ -417,14 +425,14 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
     }
 
     // 如果是新的一帧,则新建一个预积分项目
-    if (!pre_integrations[frame_count])
+    if (!pre_integrations[frame_count])//frame_count表示当前窗口内的第几帧
     {
         pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
     }
 
-    //f rame_count是窗内图像帧的计数
+    //frame_count是窗内图像帧的计数
     // 一个窗内有是个相机帧，每个相机帧之间又有多个IMU数据
-    if (frame_cobunt != 0)
+    if (frame_count != 0)
     {
         pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity);
         // push_back进行了重载，的时候就已经进行了预积分
@@ -457,7 +465,7 @@ void Estimator::processImage
 (const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header)
 // image 里边放的就是该图像的特征点 header 时间
 {
-    ROS_DEBUG("new image coming ------------------------------------------");//输入进来的其实只有特征点
+    ROS_DEBUG("new image features coming ------------------------------------------");//输入进来的其实只有特征点
     ROS_DEBUG("Adding feature points %lu", image.size());
 
     // 检测关键帧
@@ -482,7 +490,7 @@ void Estimator::processImage
     all_image_frame.insert(make_pair(header, imageframe));
     tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
 
-    // 估计一个外部参,并把ESTIMATE_EXTRINSIC置1,输出ric和RIC
+    // 估计一个外参,并把ESTIMATE_EXTRINSIC置1,输出ric和RIC
     if(ESTIMATE_EXTRINSIC == 2)
     {
         ROS_INFO("calibrating extrinsic param, rotation movement is needed");
@@ -497,6 +505,7 @@ void Estimator::processImage
                 ROS_WARN_STREAM("initial extrinsic rotation: " << endl << calib_ric);
                 //有几个相机，就有几个ric，目前单目情况下，ric内只有一个值
                 ric[0] = calib_ric;
+
                 RIC[0] = calib_ric;
                 ESTIMATE_EXTRINSIC = 1;
             }
@@ -944,7 +953,7 @@ bool Estimator::relativePose(Matrix3d &relative_R, Vector3d &relative_T, int &l)
     return false;
 }
 
-// vector转换成double数组，因为ceres使用数值数组
+// vector转换成double数组，因为ceres使用数值数组(将当前的P,V,Q换成Ceres可用的模式)
 /*可以看出来，这里面生成的优化变量由：
 para_Pose（7维，相机位姿）、
 para_SpeedBias（9维，相机速度、加速度偏置、角速度偏置）、
@@ -1226,6 +1235,7 @@ void Estimator::optimization()
         }
     }
 
+    //添加相机重投影误差
     int f_m_cnt = 0; //每个特征点,观测到它的相机的计数 visual measurement count
     int feature_index = -1;
     for (auto &it_per_id : f_manager.feature)

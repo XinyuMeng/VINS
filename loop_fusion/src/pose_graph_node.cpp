@@ -189,19 +189,20 @@ void pose_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     */
 }
 
+//可视化posegraph位姿
 void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
 {
-    //ROS_INFO("vio_callback!");
+    ROS_INFO("vio_callback!");
     Vector3d vio_t(pose_msg->pose.pose.position.x, pose_msg->pose.pose.position.y, pose_msg->pose.pose.position.z);
     Quaterniond vio_q;
     vio_q.w() = pose_msg->pose.pose.orientation.w;
     vio_q.x() = pose_msg->pose.pose.orientation.x;
     vio_q.y() = pose_msg->pose.pose.orientation.y;
     vio_q.z() = pose_msg->pose.pose.orientation.z;
-
+    // 变换至 回环参考世界坐标系,w_r_vio默认单位阵、w_t_vio默认零向量
     vio_t = posegraph.w_r_vio * vio_t + posegraph.w_t_vio;
     vio_q = posegraph.w_r_vio *  vio_q;
-
+    // 考虑 drift
     vio_t = posegraph.r_drift * vio_t + posegraph.t_drift;
     vio_q = posegraph.r_drift * vio_q;
 
@@ -217,6 +218,7 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     odometry.pose.pose.orientation.w = vio_q.w();
     pub_odometry_rect.publish(odometry);
 
+    // 获得 camera pose
     Vector3d vio_t_cam;
     Quaterniond vio_q_cam;
     vio_t_cam = vio_t + vio_q * tic;
@@ -244,7 +246,7 @@ void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
 
 void process()
 {
-    while (true)
+    while (ros::ok())
     {
         sensor_msgs::ImageConstPtr image_msg = NULL;
         sensor_msgs::PointCloudConstPtr point_msg = NULL;
@@ -252,8 +254,9 @@ void process()
 
         // find out the messages with same time stamp
         m_buf.lock();
-        if(!image_buf.empty() && !point_buf.empty() && !pose_buf.empty())
-        {
+        //获取“相同时间戳”内的pose_msg、image_msg、point_msg
+        if(!image_buf.empty() && !point_buf.empty() && !pose_buf.empty())//关键帧三要素
+        {   //图像时间戳晚于位姿时间戳，则将该位姿pop出去
             if (image_buf.front()->header.stamp.toSec() > pose_buf.front()->header.stamp.toSec())
             {
                 pose_buf.pop();
@@ -261,12 +264,14 @@ void process()
             }
             else if (image_buf.front()->header.stamp.toSec() > point_buf.front()->header.stamp.toSec())
             {
+                //图像时间戳晚于点云时间戳，则将点云位姿pop出去
                 point_buf.pop();
                 printf("throw point at beginning\n");
             }
             else if (image_buf.back()->header.stamp.toSec() >= pose_buf.front()->header.stamp.toSec() 
                 && point_buf.back()->header.stamp.toSec() >= pose_buf.front()->header.stamp.toSec())
             {
+                //则pose_msg中存放的是关键帧位姿
                 pose_msg = pose_buf.front();
                 pose_buf.pop();
                 while (!pose_buf.empty())
@@ -305,7 +310,7 @@ void process()
             {
                 skip_cnt = 0;
             }
-
+            //解析image_msg信息存入ptr变量当中
             cv_bridge::CvImageConstPtr ptr;
             if (image_msg->encoding == "8UC1")
             {
@@ -455,7 +460,8 @@ int main(int argc, char **argv)
     fsSettings["save_image"] >> DEBUG_IMAGE;
 
     LOAD_PREVIOUS_POSE_GRAPH = fsSettings["load_previous_pose_graph"];
-    VINS_RESULT_PATH = VINS_RESULT_PATH + "/vio_loop.csv";
+//    VINS_RESULT_PATH = VINS_RESULT_PATH + "/vio_loop.csv";
+    VINS_RESULT_PATH = VINS_RESULT_PATH + "/vins_result_loop.txt";
     std::ofstream fout(VINS_RESULT_PATH, std::ios::out);
     fout.close();
 

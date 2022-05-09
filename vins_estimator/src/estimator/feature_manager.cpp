@@ -112,10 +112,12 @@ bool FeatureManager::addFeatureCheckParallax
     //if (frame_count < 2 || last_track_num < 20 || new_feature_num > 0.5 * last_track_num)
     if (frame_count < 2 || last_track_num < 20 || long_track_num < 40 || new_feature_num > 0.5 * last_track_num)
         return true;
+    //关键帧数小于2 跟踪到角点数目小于20 连续被跟踪小于40帧 当前帧加入角点记录列表的数目大于跟踪到角点数目的一半(当前帧出现新的视野较多)
+    //以上4条件满足————则插入滑动窗口关键帧
 
     //计算能被当前帧和其前两帧共同看到的特征点视差
     for (auto &it_per_id : feature)
-    {
+    {   // 观测该特征点的：起始帧小于倒数第三帧，终止帧要大于倒数第二帧，保证至少有两帧能观测到。
         if (it_per_id.start_frame <= frame_count - 2 &&
             it_per_id.start_frame + int(it_per_id.feature_per_frame.size()) - 1 >= frame_count - 1)
         {
@@ -133,6 +135,7 @@ bool FeatureManager::addFeatureCheckParallax
         ROS_DEBUG("parallax_sum: %lf, parallax_num: %d", parallax_sum, parallax_num);
         ROS_DEBUG("current parallax: %lf", parallax_sum / parallax_num * FOCAL_LENGTH);
         last_average_parallax = parallax_sum / parallax_num * FOCAL_LENGTH;
+        // 平均视差大于阈值的是关键帧
         return parallax_sum / parallax_num >= MIN_PARALLAX;
     }
 }
@@ -164,22 +167,22 @@ vector<pair<Vector3d, Vector3d>> FeatureManager::getCorresponding(int frame_coun
 void FeatureManager::setDepth(const VectorXd &x)
 {
     int feature_index = -1;
-    for (auto &it_per_id : feature)
+    for (auto &it_per_id : feature)// 遍历所有特征点
     {
         it_per_id.used_num = it_per_id.feature_per_frame.size();
         if (it_per_id.used_num < 4)
             continue;
-
+        // 求解逆深度
         it_per_id.estimated_depth = 1.0 / x(++feature_index);
         //ROS_INFO("feature id %d , start_frame %d, depth %f ", it_per_id->feature_id, it_per_id-> start_frame, it_per_id->estimated_depth);
         
-        // 深度失败
+        // 深度小于0估计失败
         if (it_per_id.estimated_depth < 0)
         {
-            it_per_id.solve_flag = 2;
+            it_per_id.solve_flag = 2;//失败估计
         }
         else
-            it_per_id.solve_flag = 1;
+            it_per_id.solve_flag = 1;//成功估计
     }
 }
 
@@ -495,7 +498,7 @@ void FeatureManager::removeBackShiftDepth(Eigen::Matrix3d marg_R, Eigen::Vector3
 
         if (it->start_frame != 0)
             it->start_frame--;
-        else
+        else//如果是最老的一帧
         {
             Eigen::Vector3d uv_i = it->feature_per_frame[0].point;  
             it->feature_per_frame.erase(it->feature_per_frame.begin());
