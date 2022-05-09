@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 #ifdef EIGEN_DONT_PARALLELIZE
     ROS_DEBUG("EIGEN_DONT_PARALLELIZE");
 #endif
-
+    ROS_ERROR("TEST")
     ROS_WARN("waiting for image and imu...");
 
     registerPub(n);//FIXME:(寄存器register)
