@@ -75,6 +75,9 @@ cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr &img_msg)
         img.data = img_msg->data;
         img.encoding = "mono8";
         ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
+        printf("-_-_-_--_-_-_--_-_-_--_-_-_--_-_-_-");
+        printf(" image height %d \n", img_msg->height);
+        printf(" image time %f \n", img_msg->header.stamp.toSec());
     }
     else
         ptr = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::MONO8);
@@ -271,7 +274,6 @@ int main(int argc, char **argv)
 #ifdef EIGEN_DONT_PARALLELIZE
     ROS_DEBUG("EIGEN_DONT_PARALLELIZE");
 #endif
-    ROS_ERROR("TEST")
     ROS_WARN("waiting for image and imu...");
 
     registerPub(n);//FIXME:(寄存器register)

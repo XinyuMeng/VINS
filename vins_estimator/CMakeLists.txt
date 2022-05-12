@@ -17,8 +17,13 @@ find_package(catkin REQUIRED COMPONENTS
     camera_models
     image_transport)
 
+#set( OpenCV_DIR “/home/mxy/KUS/opencv-3.4.15/build”)
+#set( OpenCV_DIR “/usr/local/include/opencv2”)
+#set(OpenCV_DIR /usr/share/OpenCV/) #found version "3.2.0"
 find_package(OpenCV REQUIRED)
-
+MESSAGE(STATUS "OpenCV version: "${OpenCV_VERSION})
+MESSAGE(${PROJECT_SOURCE_DIR})
+MESSAGE(${PROJECT_BINARY_DIR})
 # message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
 
 find_package(Ceres REQUIRED)
@@ -26,7 +31,11 @@ find_package(Ceres REQUIRED)
 include_directories(${catkin_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS})
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
+#set(Eigen3_DIR "/usr/local/include/eigen3/Eigen")
 find_package(Eigen3)
+MESSAGE(STATUS "Eigen version: "${Eigen_VERSION})
+
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
@@ -50,7 +59,7 @@ add_library(vins_lib
     src/initial/initial_aligment.cpp
     src/initial/initial_sfm.cpp
     src/initial/initial_ex_rotation.cpp
-    src/featureTracker/feature_tracker.cpp src/estimator/VinsTest.cpp src/estimator/VinsTest.h)
+    src/featureTracker/feature_tracker.cpp)
 target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES})
 
 
