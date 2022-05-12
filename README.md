@@ -1,11 +1,10 @@
 # VINS-Fusion中文注释版
 仅供学习用.
-
-// local
+// local google style
 
 十分感谢港科大各位老师的工作.
 
-//Remote
+
 
 目前仅仅注释了前端VIO部分.
 ## 相应博客
