@@ -1,6 +1,6 @@
 # VINS-Fusion中文注释版
 仅供学习用.
-
+//remote master
 // local google style
 
 十分感谢港科大各位老师的工作.
